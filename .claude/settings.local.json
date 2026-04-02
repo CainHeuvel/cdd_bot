@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash('O:/Operatie/CDD/App/Agentic CDD tooling/.venv/Scripts/python.exe' -m pip list --format=json)",
+      "Bash(python -c \"import json,sys; pkgs={p[''''name''''].lower\\(\\):p[''''version''''] for p in json.load\\(sys.stdin\\)}; targets=[''''streamlit'''',''''langgraph'''',''''langchain'''',''''langchain-openai'''',''''azure-ai-documentintelligence'''',''''azure-identity'''',''''pydantic'''',''''pydantic-settings'''',''''python-dotenv'''']; [print\\(f\"\"{t}=={pkgs.get\\(t,''''?''''\\)}\"\"\\) for t in targets]\")",
+      "Bash('O:/Operatie/CDD/App/Agentic CDD tooling/.venv/Scripts/pip.exe' list)",
+      "Bash('O:/Operatie/CDD/App/Agentic CDD tooling/.venv/Scripts/pip.exe' freeze)",
+      "Bash(\"O:/Operatie/CDD/App/Agentic CDD tooling/.venv/Scripts/python.exe\" -c \"import streamlit; print\\(''streamlit'', streamlit.__version__\\)\")",
+      "Bash(\"O:/Operatie/CDD/App/Agentic CDD tooling/.venv/Scripts/python.exe\" -c \"import langgraph; print\\(''langgraph'', langgraph.__version__\\)\")",
+      "Bash(\"O:/Operatie/CDD/App/Agentic CDD tooling/.venv/Scripts/python.exe\" -c \"import langchain; print\\(''langchain'', langchain.__version__\\)\")",
+      "Bash(\"O:/Operatie/CDD/App/Agentic CDD tooling/.venv/Scripts/python.exe\" -c \"import langchain_openai; print\\(''langchain_openai'', langchain_openai.__version__\\)\")",
+      "Bash(\"O:/Operatie/CDD/App/Agentic CDD tooling/.venv/Scripts/python.exe\" -c \"import pydantic; print\\(''pydantic'', pydantic.__version__\\)\")",
+      "Bash(find 'O:/Operatie/CDD/App/Agentic CDD tooling' -type f \\\\\\(-name *.html -o -name *.json -o -name *.yaml -o -name *.yml \\\\\\))",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -sL \"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\" -o \"/o/Operatie/CDD/App/Agentic CDD tooling/static/mermaid.min.js\")",
+      "Bash(mkdir -p \"O:/Operatie/CDD/App/Agentic CDD tooling/models\")",
+      "Bash(mkdir -p \"O:/Operatie/CDD/App/Agentic CDD tooling/rendering\")",
+      "Bash(.venv/Scripts/python.exe -c \"import sys; print\\(sys.executable\\); print\\(sys.prefix\\)\")",
+      "Bash(.venv/Scripts/pip.exe list:*)",
+      "Bash(.venv/Scripts/python.exe -m pip list)",
+      "Bash(.venv/Scripts/python.exe -c \"import streamlit; import langgraph; import langchain_openai; import azure.ai.documentintelligence; print\\(''All core imports OK''\\)\")",
+      "Bash(rm -rf .venv)",
+      "Bash(C:/Python313/python.exe -m venv .venv)",
+      "Bash(.venv/Scripts/python.exe -m pip install -r requirements.txt)",
+      "Bash(.venv/Scripts/python.exe -c \"import streamlit; import langgraph; import langchain_openai; import azure.ai.documentintelligence; import pydantic_settings; print\\(''Alle core imports OK''\\)\")",
+      "Bash(.venv/Scripts/streamlit.exe run:*)",
+      "Bash(.venv/Scripts/python.exe -m pip install graphviz)",
+      "Bash(.venv/Scripts/python.exe -m pip install langchain-anthropic)"
+    ]
+  }
+}
