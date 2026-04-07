@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
@@ -13,6 +14,8 @@ from azure.core.exceptions import HttpResponseError, ServiceRequestError
 from config import get_settings
 
 logger = logging.getLogger(__name__)
+
+_MAX_WORKERS = 5
 
 
 def _table_to_markdown(table: Any) -> str:
@@ -35,8 +38,54 @@ def _table_to_markdown(table: Any) -> str:
     return "\n".join(lines)
 
 
+def _process_single(
+    client: DocumentIntelligenceClient,
+    filename: str,
+    file_bytes: bytes,
+) -> dict[str, Any]:
+    """Process a single PDF file via Azure Document Intelligence."""
+    try:
+        poller = client.begin_analyze_document(
+            model_id="prebuilt-layout",
+            body=AnalyzeDocumentRequest(bytes_source=file_bytes),
+        )
+        result = poller.result()
+
+        raw_text = result.content or ""
+
+        tables_md: list[str] = []
+        if result.tables:
+            for idx, table in enumerate(result.tables):
+                tables_md.append(f"### Tabel {idx + 1}\n{_table_to_markdown(table)}")
+
+        logger.info("Verwerkt: %s (%d karakters, %d tabellen)", filename, len(raw_text), len(tables_md))
+        return {
+            "filename": filename,
+            "raw_text": raw_text,
+            "tables": "\n\n".join(tables_md),
+        }
+
+    except (HttpResponseError, ServiceRequestError) as exc:
+        logger.exception("Azure API fout bij verwerken van %s: %s", filename, type(exc).__name__)
+        return {
+            "filename": filename,
+            "raw_text": f"[FOUT: Kon {filename} niet verwerken — {type(exc).__name__}]",
+            "tables": "",
+        }
+    except Exception:
+        logger.exception("Onverwachte fout bij verwerken van %s", filename)
+        return {
+            "filename": filename,
+            "raw_text": f"[FOUT: Kon {filename} niet verwerken]",
+            "tables": "",
+        }
+
+
 def process_documents(files: list[tuple[str, bytes]]) -> list[dict[str, Any]]:
     """Process uploaded PDF files via Azure Document Intelligence.
+
+    Files are processed in parallel (up to ``_MAX_WORKERS`` concurrent calls)
+    to reduce wall-clock time. Results are returned in the original order.
 
     Args:
         files: List of (filename, file_bytes) tuples.
@@ -44,49 +93,24 @@ def process_documents(files: list[tuple[str, bytes]]) -> list[dict[str, Any]]:
     Returns:
         List of dicts with keys: filename, raw_text, tables (as Markdown).
     """
+    if not files:
+        return []
+
     settings = get_settings()
     client = DocumentIntelligenceClient(
         endpoint=settings.azure_doc_intel_endpoint,
         credential=AzureKeyCredential(settings.azure_doc_intel_key),
     )
 
-    results: list[dict[str, Any]] = []
+    results: list[dict[str, Any] | None] = [None] * len(files)
 
-    for filename, file_bytes in files:
-        try:
-            poller = client.begin_analyze_document(
-                model_id="prebuilt-layout",
-                body=AnalyzeDocumentRequest(bytes_source=file_bytes),
-            )
-            result = poller.result()
+    with ThreadPoolExecutor(max_workers=min(_MAX_WORKERS, len(files))) as pool:
+        future_to_idx = {
+            pool.submit(_process_single, client, filename, file_bytes): idx
+            for idx, (filename, file_bytes) in enumerate(files)
+        }
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            results[idx] = future.result()
 
-            raw_text = result.content or ""
-
-            tables_md: list[str] = []
-            if result.tables:
-                for idx, table in enumerate(result.tables):
-                    tables_md.append(f"### Tabel {idx + 1}\n{_table_to_markdown(table)}")
-
-            results.append({
-                "filename": filename,
-                "raw_text": raw_text,
-                "tables": "\n\n".join(tables_md),
-            })
-            logger.info("Verwerkt: %s (%d karakters, %d tabellen)", filename, len(raw_text), len(tables_md))
-
-        except (HttpResponseError, ServiceRequestError) as exc:
-            logger.exception("Azure API fout bij verwerken van %s: %s", filename, type(exc).__name__)
-            results.append({
-                "filename": filename,
-                "raw_text": f"[FOUT: Kon {filename} niet verwerken — {type(exc).__name__}]",
-                "tables": "",
-            })
-        except Exception:
-            logger.exception("Onverwachte fout bij verwerken van %s", filename)
-            results.append({
-                "filename": filename,
-                "raw_text": f"[FOUT: Kon {filename} niet verwerken]",
-                "tables": "",
-            })
-
-    return results
+    return results  # type: ignore[return-value]

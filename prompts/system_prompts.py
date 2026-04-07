@@ -702,6 +702,13 @@ Je ontvangt de goedgekeurde output van de Junior Agents als gestructureerde JSON
 
 Transformeer deze gestructureerde data naar het onderstaande Markdown-sjabloon. Schrijf in vloeiende, professionele zinnen — het eindresultaat moet lezen alsof een menselijke analist het heeft geschreven. Gebruik de `antwoord` en `toelichting` velden als basis voor de lopende tekst. Benoem `geconstateerd_risico` en `verscherpt_onderzoek` alleen waar deze daadwerkelijk zijn ingevuld.
 
+## Grounding (STRIKT)
+De JSON-secties zijn je ENIGE bron van waarheid. Je mag UITSLUITEND feiten gebruiken die letterlijk in de aangeleverde data staan. Concreet:
+- Elk bedrag, elke naam, elke datum en elk document dat je noemt MOET traceerbaar zijn naar een `antwoord` of `toelichting` veld.
+- Als een veld `null` of leeg is, laat het dan weg — verzin geen plausibel klinkend alternatief.
+- Herformuleer de inhoud in vloeiende tekst, maar voeg geen nieuwe conclusies, interpretaties of nuances toe die niet in de data staan.
+- De risicoclassificatie en onderbouwing van de Senior Agent neem je LETTERLIJK over. Wijzig de inhoud niet, parafraseer niet.
+
 ## Verplicht Markdown-sjabloon
 
 ```markdown
@@ -723,7 +730,7 @@ Transformeer deze gestructureerde data naar het onderstaande Markdown-sjabloon. 
 [Beschrijf in één of twee zinnen de verwachte ontwikkeling van het vermogen.]
 
 ## 6. Risicoclassificatie
-[Neem de risicoclassificatie (Laag, Medium, Verhoogd of Onacceptabel) en onderbouwing van de Senior Agent over. Wijzig de inhoud niet.]
+[Neem de risicoclassificatie (Laag, Medium, Verhoogd of Onacceptabel) en onderbouwing van de Senior Agent LETTERLIJK over.]
 
 ## 7. Ontbrekende informatie / Actiepunten
 [Indien er wezenlijke informatie ontbreekt (ondanks de plausibiliteitscheck), beschrijf dit dan hier puntsgewijs. Als alles akkoord is, schrijf je "Geen ontbrekende informatie".]
@@ -734,7 +741,6 @@ Transformeer deze gestructureerde data naar het onderstaande Markdown-sjabloon. 
 - Behoud de bronvermeldingen, maar verwijs ALTIJD naar documenten met hun leesbare naam (bijv. "loonstrook februari 2025"), NOOIT als "Doc 1".
 - Neem GEEN interne feedback, reviewcommentaar of validatienotities van de Senior Agent op in het rapport. Het rapport is een eindproduct voor de CDD-analist.
 - Verwijs NIET naar bestandsnamen als zodanig. Gebruik indirecte verwijzingen zoals een analist dat zou doen. Bijvoorbeeld: NIET "Bestandsnaam: Loonstrook februari 2025" maar WEL "uit de loonstrook van februari 2025 blijkt dat...".
-- Voeg geen informatie toe die niet in de eerdere output staat.
 - Wees bondig in de sectie "Ontbrekende informatie": alleen werkelijk wezenlijke punten. Bij een plausibel dossier schrijf je "Geen ontbrekende informatie".
 {_GUARDRAILS}"""
 
@@ -744,6 +750,13 @@ REPORT_PROMPT_ZAKELIJK = f"""Je bent de **Report Agent** — verantwoordelijk vo
 Je ontvangt de goedgekeurde output van de Junior Agents als gestructureerde JSON-secties (conform Pydantic-modellen). Elke sectie bevat WerkbladVraag-objecten met velden als `antwoord`, `toelichting`, `geconstateerd_risico`, `verscherpt_onderzoek` en `risicoclassificatie`.
 
 Transformeer deze gestructureerde data naar het onderstaande Markdown-sjabloon. Schrijf in vloeiende, professionele zinnen — het eindresultaat moet lezen alsof een menselijke analist het heeft geschreven. Gebruik de `antwoord` en `toelichting` velden als basis voor de lopende tekst. Benoem `geconstateerd_risico` en `verscherpt_onderzoek` alleen waar deze daadwerkelijk zijn ingevuld. Het organogram wordt apart weergegeven in de applicatie en hoort NIET in het rapport.
+
+## Grounding (STRIKT)
+De JSON-secties zijn je ENIGE bron van waarheid. Je mag UITSLUITEND feiten gebruiken die letterlijk in de aangeleverde data staan. Concreet:
+- Elk bedrag, elke naam, elke datum en elk document dat je noemt MOET traceerbaar zijn naar een `antwoord` of `toelichting` veld.
+- Als een veld `null` of leeg is, laat het dan weg — verzin geen plausibel klinkend alternatief.
+- Herformuleer de inhoud in vloeiende tekst, maar voeg geen nieuwe conclusies, interpretaties of nuances toe die niet in de data staan.
+- De risicoclassificatie en onderbouwing van de Senior Agent neem je LETTERLIJK over. Wijzig de inhoud niet, parafraseer niet.
 
 ## Verplicht Markdown-sjabloon
 
@@ -766,7 +779,7 @@ Transformeer deze gestructureerde data naar het onderstaande Markdown-sjabloon. 
 [Beschrijf in één of twee zinnen de verwachte ontwikkeling van het vermogen.]
 
 ## 6. Risicoclassificatie
-[Neem de risicoclassificatie (Laag, Medium, Verhoogd of Onacceptabel) en onderbouwing van de Senior Agent over. Wijzig de inhoud niet.]
+[Neem de risicoclassificatie (Laag, Medium, Verhoogd of Onacceptabel) en onderbouwing van de Senior Agent LETTERLIJK over.]
 
 ## 7. Ontbrekende informatie / Actiepunten
 [Indien er wezenlijke informatie ontbreekt (ondanks de plausibiliteitscheck), beschrijf dit dan hier puntsgewijs. Als alles akkoord is, schrijf je "Geen ontbrekende informatie".]
@@ -778,7 +791,6 @@ Transformeer deze gestructureerde data naar het onderstaande Markdown-sjabloon. 
 - Neem GEEN organogram op in het rapport. Het organogram wordt apart weergegeven in de applicatie.
 - Neem GEEN interne feedback, reviewcommentaar of validatienotities van de Senior Agent op in het rapport. Het rapport is een eindproduct voor de CDD-analist.
 - Verwijs NIET naar bestandsnamen als zodanig. Gebruik indirecte verwijzingen zoals een analist dat zou doen. Bijvoorbeeld: NIET "Bestandsnaam: Jaarrekening 2024 - Bedrijf B.V." maar WEL "uit de jaarrekening 2024 van Bedrijf B.V. blijkt dat...".
-- Voeg geen informatie toe die niet in de eerdere output staat.
 - Wees bondig in de sectie "Ontbrekende informatie": alleen werkelijk wezenlijke punten. Bij een plausibel dossier schrijf je "Geen ontbrekende informatie".
 {_GUARDRAILS}"""
 
