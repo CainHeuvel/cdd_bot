@@ -1,0 +1,26 @@
+{
+  "_comment": "Template voor een gold dossier. Kopieer dit bestand, hernoem naar bijv. 'particulier_laag_risico.json', en vul de velden in.",
+  "name": "Korte beschrijving van het dossier",
+  "client_type": "particulier",
+  "toelichting": "Toelichting zoals de analist die zou invoeren",
+  "pdf_paths": [
+    "relatief/pad/naar/document1.pdf",
+    "relatief/pad/naar/document2.pdf"
+  ],
+  "expected": {
+    "risicoclassificatie": "Laag",
+    "must_have_facts": [
+      "Naam van de klant verschijnt in het rapport",
+      "Inkomen uit werk wordt benoemd als herkomstbron"
+    ],
+    "must_not_have": [
+      "Verzonnen bedrijfsnaam die niet in de documenten staat"
+    ],
+    "expected_herkomst_bronnen": [
+      "Inkomen uit werk"
+    ],
+    "expected_empty_fields_max": 5,
+    "max_iterations": 2,
+    "expected_senior_status": "GOEDGEKEURD"
+  }
+}

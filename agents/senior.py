@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from config import get_heavy_llm, get_settings
 from models.agent_contracts import SeniorDecision
+from observability import count_empty_fields
 from prompts.system_prompts import SENIOR_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -101,10 +102,21 @@ def senior_agent(state: dict[str, Any]) -> dict[str, Any]:
             f"- {g}" for g in decision.remaining_gaps
         )
 
+    total_empty = 0
+    for label, key in [
+        ("identificatie", "identificatie_sectie"),
+        ("klantprofiel", "klantprofiel_sectie"),
+        ("screening", "screening_sectie"),
+        ("structuur_ubo", "structuur_ubo_sectie"),
+        ("herkomst", "herkomst_sectie"),
+        ("transactieprofiel", "transactieprofiel_sectie"),
+    ]:
+        total_empty += count_empty_fields(state.get(key), label)
+
     logger.info(
-        "Senior decision | iteration=%d | status=%s | risico=%s | gaps=%d | feedback_items=%d",
+        "Senior decision | iteration=%d | status=%s | risico=%s | gaps=%d | feedback_items=%d | empty_antwoord_fields=%d",
         iteration, decision.status, decision.risicoclassificatie,
-        len(decision.remaining_gaps), len(feedback_items),
+        len(decision.remaining_gaps), len(feedback_items), total_empty,
     )
 
     return {

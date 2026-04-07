@@ -14,6 +14,7 @@ import streamlit as st
 
 from cdd_graph import CddState, build_graph
 from doc_processor import process_documents
+from observability import TokenUsageHandler
 
 logger = logging.getLogger("cdd_pipeline")
 if not logger.handlers:
@@ -93,6 +94,8 @@ def _run_graph(
     Streams node-level updates into *update_queue*.  Sends ``None`` as a
     sentinel value when the graph finishes.
     """
+    token_handler = TokenUsageHandler()
+
     logger.info(
         "Pipeline start | client_type=%s | documents=%d",
         input_state.get("client_type"),
@@ -100,14 +103,25 @@ def _run_graph(
     )
     try:
         compiled = build_graph()
-        for idx, chunk in enumerate(compiled.stream(input_state, stream_mode="updates"), start=1):
+        for idx, chunk in enumerate(
+            compiled.stream(
+                input_state,
+                stream_mode="updates",
+                config={"callbacks": [token_handler]},
+            ),
+            start=1,
+        ):
             logger.info("Graph update #%d | nodes=%s", idx, list(chunk.keys()))
             update_queue.put(chunk)
     except Exception as exc:
         logger.exception("Pipeline exception: %s", exc)
         update_queue.put({"__error__": str(exc)})
     finally:
-        logger.info("Pipeline finished (sentinel queued)")
+        summary = token_handler.summary()
+        logger.info(
+            "Pipeline finished | %s",
+            " | ".join(f"{k}={v}" for k, v in summary.items()),
+        )
         update_queue.put(None)
 
 
