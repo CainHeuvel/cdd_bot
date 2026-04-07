@@ -27,6 +27,8 @@ class ScoreResult:
     must_have_hits: int = 0
     must_have_total: int = 0
     must_not_violations: int = 0
+    herkomst_hits: int = 0
+    herkomst_total: int = 0
     token_usage: dict[str, int] = field(default_factory=dict)
 
     def summary_line(self) -> str:
@@ -37,9 +39,23 @@ class ScoreResult:
             f"iterations={self.iteration_count} | "
             f"empty_fields={self.total_empty_fields} | "
             f"must_have={self.must_have_hits}/{self.must_have_total} | "
+            f"herkomst={self.herkomst_hits}/{self.herkomst_total} | "
             f"violations={self.must_not_violations} | "
-            f"tokens={self.token_usage.get('total_tokens', '?')}"
+            f"tokens={self.token_usage.get('total_tokens', '?')} | "
+            f"schema_failures={self.token_usage.get('schema_validation_failures', 0)}"
         )
+
+
+def _extract_herkomst_sources(final_state: dict[str, Any]) -> list[str]:
+    """Extract normalized herkomstbronnen from the Junior Herkomst section."""
+    herkomst_sectie = final_state.get("herkomst_sectie") or {}
+    herkomst_middelen = herkomst_sectie.get("herkomst_middelen") or {}
+    antwoord = herkomst_middelen.get("antwoord", "")
+    if not antwoord:
+        return []
+
+    raw_sources = re.split(r"[,;\n]|(?:\s+-\s+)", antwoord)
+    return [source.strip().lower() for source in raw_sources if source.strip()]
 
 
 def score_run(
@@ -73,6 +89,7 @@ def score_run(
     result.iteration_count = actual_iterations
     max_iter = expected.get("max_iterations")
     if max_iter is not None and actual_iterations > max_iter:
+        result.passed = False
         result.details.append(
             f"Iteration overshoot: expected<={max_iter}, got={actual_iterations}"
         )
@@ -82,6 +99,7 @@ def score_run(
         senior_review = final_state.get("senior_review", "")
         result.senior_status_match = expected_status in senior_review
         if not result.senior_status_match:
+            result.passed = False
             result.details.append(
                 f"Senior status mismatch: expected {expected_status} in senior_review"
             )
@@ -105,8 +123,17 @@ def score_run(
             f"Too many empty fields: expected<={max_empty}, got={total_empty}"
         )
 
+    actual_sources = _extract_herkomst_sources(final_state)
+    expected_sources = expected.get("expected_herkomst_bronnen", [])
+    result.herkomst_total = len(expected_sources)
+    for source in expected_sources:
+        if any(source.lower() in actual_source for actual_source in actual_sources):
+            result.herkomst_hits += 1
+        else:
+            result.passed = False
+            result.details.append(f"Missing expected herkomstbron: '{source}'")
+
     report = final_state.get("final_report", "")
-    report_lower = report.lower()
 
     must_have = expected.get("must_have_facts", [])
     result.must_have_total = len(must_have)

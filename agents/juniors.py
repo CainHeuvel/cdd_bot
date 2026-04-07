@@ -7,18 +7,22 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from config import get_light_llm
+from langchain_core.language_models.chat_models import BaseChatModel
+
+from config import get_heavy_llm, get_light_llm
 from models.agent_contracts import JuniorStructuurParticulier, JuniorStructuurZakelijk
 from models.cdd_dossier import (
     HerkomstMiddelen,
     Transactieprofiel,
 )
 from models.organogram import OrganogramData
+from observability import invoke_structured
 from prompts.system_prompts import (
     JUNIOR_HERKOMST_PROMPT,
     JUNIOR_STRUCTUUR_PROMPT,
@@ -28,6 +32,14 @@ from prompts.system_prompts import (
 from rendering.organogram import render_organogram_svg
 
 logger = logging.getLogger(__name__)
+
+
+def _get_junior_llm(state: dict[str, Any], escalation_key: str) -> BaseChatModel:
+    """Return the default light model or heavy model on difficult retries."""
+    if state.get(escalation_key, False):
+        logger.info("Escalating model for %s", escalation_key)
+        return get_heavy_llm()
+    return get_light_llm()
 
 
 def _build_user_message(
@@ -45,6 +57,7 @@ def _build_user_message(
     client_type: str = state["client_type"]
     toelichting: str = state["toelichting"]
     recon_index: str = state["recon_index"]
+    recon_evidence = state.get("recon_evidence")
 
     manager_instructions = state.get(instruction_key, "") if instruction_key else state.get("manager_instructions", "")
     manager_feedback_algemeen: str = state.get("manager_feedback_algemeen", "")
@@ -64,6 +77,12 @@ def _build_user_message(
             "## Feedback analist\n"
             + "\n".join(f"- {fb}" for fb in analyst_feedback)
         )
+    if recon_evidence:
+        parts.append(
+            "## Structured evidence (Recon Agent)\n```json\n"
+            + json.dumps(recon_evidence, indent=2, ensure_ascii=False)
+            + "\n```"
+        )
     return "\n\n".join(parts)
 
 
@@ -76,7 +95,7 @@ def junior_structuur_agent(state: dict[str, Any]) -> dict[str, Any]:
     Writes: identificatie_sectie, klantprofiel_sectie, screening_sectie,
             structuur_ubo_sectie, organogram_svg, organogram_data, organogram_warning
     """
-    llm = get_light_llm()
+    llm = _get_junior_llm(state, "escalate_junior_structuur")
     messages = [
         SystemMessage(content=JUNIOR_STRUCTUUR_PROMPT),
         HumanMessage(content=_build_user_message(state, instruction_key="manager_instructie_structuur")),
@@ -89,15 +108,14 @@ def junior_structuur_agent(state: dict[str, Any]) -> dict[str, Any]:
     organogram_warning = ""
 
     if is_zakelijk:
-        combined = llm.with_structured_output(JuniorStructuurZakelijk).invoke(messages)
+        combined = invoke_structured("junior_structuur", llm, JuniorStructuurZakelijk, messages)
         structuur_ubo_sectie = combined.structuur_en_ubo.model_dump()
 
         try:
-            organogram_llm = llm.with_structured_output(OrganogramData)
             eigendomsstructuur_tekst = combined.structuur_en_ubo.eigendomsstructuur.antwoord
             if combined.structuur_en_ubo.eigendomsstructuur.toelichting:
                 eigendomsstructuur_tekst += "\n" + combined.structuur_en_ubo.eigendomsstructuur.toelichting
-            org_result = organogram_llm.invoke([
+            org_result = invoke_structured("junior_structuur", llm, OrganogramData, [
                 SystemMessage(content=ORGANOGRAM_EXTRACTION_PROMPT),
                 HumanMessage(content=eigendomsstructuur_tekst),
             ])
@@ -111,7 +129,7 @@ def junior_structuur_agent(state: dict[str, Any]) -> dict[str, Any]:
                 "voldoende duidelijk is beschreven."
             )
     else:
-        combined = llm.with_structured_output(JuniorStructuurParticulier).invoke(messages)
+        combined = invoke_structured("junior_structuur", llm, JuniorStructuurParticulier, messages)
 
     return {
         "identificatie_sectie": combined.identificatie_verificatie.model_dump(),
@@ -129,13 +147,12 @@ def junior_herkomst_agent(state: dict[str, Any]) -> dict[str, Any]:
 
     Writes: herkomst_sectie
     """
-    llm = get_light_llm()
-    structured_llm = llm.with_structured_output(HerkomstMiddelen)
+    llm = _get_junior_llm(state, "escalate_junior_herkomst")
     messages = [
         SystemMessage(content=JUNIOR_HERKOMST_PROMPT),
         HumanMessage(content=_build_user_message(state, instruction_key="manager_instructie_herkomst")),
     ]
-    result: HerkomstMiddelen = structured_llm.invoke(messages)
+    result = invoke_structured("junior_herkomst", llm, HerkomstMiddelen, messages)
 
     return {
         "herkomst_sectie": result.model_dump(),
@@ -147,13 +164,12 @@ def junior_vermogen_agent(state: dict[str, Any]) -> dict[str, Any]:
 
     Writes: transactieprofiel_sectie
     """
-    llm = get_light_llm()
-    structured_llm = llm.with_structured_output(Transactieprofiel)
+    llm = _get_junior_llm(state, "escalate_junior_vermogen")
     messages = [
         SystemMessage(content=JUNIOR_VERMOGEN_PROMPT),
         HumanMessage(content=_build_user_message(state, instruction_key="manager_instructie_vermogen")),
     ]
-    result: Transactieprofiel = structured_llm.invoke(messages)
+    result = invoke_structured("junior_vermogen", llm, Transactieprofiel, messages)
 
     return {
         "transactieprofiel_sectie": result.model_dump(),

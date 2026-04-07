@@ -14,7 +14,11 @@ import streamlit as st
 
 from cdd_graph import CddState, build_graph
 from doc_processor import process_documents
-from observability import TokenUsageHandler
+from observability import (
+    RunObservability,
+    activate_run_observability,
+    deactivate_run_observability,
+)
 
 logger = logging.getLogger("cdd_pipeline")
 if not logger.handlers:
@@ -94,7 +98,8 @@ def _run_graph(
     Streams node-level updates into *update_queue*.  Sends ``None`` as a
     sentinel value when the graph finishes.
     """
-    token_handler = TokenUsageHandler()
+    run_observability = RunObservability()
+    obs_token = activate_run_observability(run_observability)
 
     logger.info(
         "Pipeline start | client_type=%s | documents=%d",
@@ -107,7 +112,7 @@ def _run_graph(
             compiled.stream(
                 input_state,
                 stream_mode="updates",
-                config={"callbacks": [token_handler]},
+                config={"callbacks": [run_observability.token_handler]},
             ),
             start=1,
         ):
@@ -117,17 +122,19 @@ def _run_graph(
         logger.exception("Pipeline exception: %s", exc)
         update_queue.put({"__error__": str(exc)})
     finally:
-        summary = token_handler.summary()
+        summary = run_observability.summary()
         logger.info(
             "Pipeline finished | %s",
             " | ".join(f"{k}={v}" for k, v in summary.items()),
         )
+        deactivate_run_observability(obs_token)
         update_queue.put(None)
 
 
 def _build_raw_data_json(final_state: dict[str, Any]) -> str:
     """Build a JSON export of all structured CDD sections."""
     keys = [
+        "recon_evidence",
         "identificatie_sectie",
         "klantprofiel_sectie",
         "screening_sectie",

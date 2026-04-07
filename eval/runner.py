@@ -17,7 +17,11 @@ from typing import Any
 
 from cdd_graph import build_graph
 from doc_processor import process_documents
-from observability import TokenUsageHandler
+from observability import (
+    RunObservability,
+    activate_run_observability,
+    deactivate_run_observability,
+)
 
 from eval.scorer import ScoreResult, score_run
 
@@ -68,24 +72,28 @@ def run_single(dossier_path: Path) -> ScoreResult:
         "documents": documents,
     }
 
-    token_handler = TokenUsageHandler()
+    run_observability = RunObservability()
+    obs_token = activate_run_observability(run_observability)
     compiled = build_graph()
 
     final_state: dict[str, Any] = {}
-    for chunk in compiled.stream(
-        input_state,
-        stream_mode="updates",
-        config={"callbacks": [token_handler]},
-    ):
-        for node_name, node_output in chunk.items():
-            if isinstance(node_output, dict):
-                final_state.update(node_output)
+    try:
+        for chunk in compiled.stream(
+            input_state,
+            stream_mode="updates",
+            config={"callbacks": [run_observability.token_handler]},
+        ):
+            for node_output in chunk.values():
+                if isinstance(node_output, dict):
+                    final_state.update(node_output)
+    finally:
+        deactivate_run_observability(obs_token)
 
     result = score_run(
         final_state=final_state,
         expected=dossier.get("expected", {}),
         name=name,
-        token_summary=token_handler.summary(),
+        token_summary=run_observability.summary(),
     )
 
     logger.info(result.summary_line())
@@ -153,6 +161,9 @@ def main() -> None:
         sys.exit(0 if result.passed else 1)
     else:
         results = run_all()
+        if not results:
+            print(f"No gold dossiers found in {GOLD_DIR}", file=sys.stderr)
+            sys.exit(1)
         sys.exit(0 if all(r.passed for r in results) else 1)
 
 

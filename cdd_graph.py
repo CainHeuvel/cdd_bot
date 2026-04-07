@@ -28,11 +28,16 @@ class CddState(TypedDict, total=False):
     documents: list[dict[str, Any]]
 
     recon_index: str
+    recon_evidence: dict | None
     manager_instructions: str
     manager_feedback_algemeen: str
     manager_instructie_structuur: str
     manager_instructie_herkomst: str
     manager_instructie_vermogen: str
+    pending_juniors: list[str]
+    escalate_junior_structuur: bool
+    escalate_junior_herkomst: bool
+    escalate_junior_vermogen: bool
 
     # Gestructureerde secties (Pydantic .model_dump() dicts)
     identificatie_sectie: dict | None
@@ -66,11 +71,11 @@ class CddState(TypedDict, total=False):
 
 def _fan_out_to_juniors(state: CddState) -> list[Send]:
     """Dispatch work to all three Junior agents in parallel."""
-    return [
-        Send("junior_structuur", state),
-        Send("junior_herkomst", state),
-        Send("junior_vermogen", state),
-    ]
+    pending = state.get(
+        "pending_juniors",
+        ["junior_structuur", "junior_herkomst", "junior_vermogen"],
+    )
+    return [Send(node_name, state) for node_name in pending]
 
 
 # ─── Conditional edge: Senior → Report or back to Manager ────────────────────

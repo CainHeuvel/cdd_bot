@@ -117,6 +117,58 @@ class ManagerInstructions(BaseModel):
     )
 
 
+class ReconDocumentEvidence(BaseModel):
+    """Structured evidence summary for one OCR document."""
+
+    readable_name: str = Field(
+        description="Korte leesbare documentnaam, bijvoorbeeld 'Loonstrook februari 2025'.",
+    )
+    document_type: str = Field(
+        description="Type document, bijvoorbeeld loonstrook, KvK-uittreksel of jaarrekening.",
+    )
+    entities: list[str] = Field(
+        default_factory=list,
+        description="Belangrijkste genoemde personen, bedrijven, nummers of rekeningen.",
+    )
+    amounts: list[str] = Field(
+        default_factory=list,
+        description="Relevante bedragen met korte context.",
+    )
+    dates: list[str] = Field(
+        default_factory=list,
+        description="Relevante datums uit het document.",
+    )
+    bijlage1_sources: list[str] = Field(
+        default_factory=list,
+        description="Bijlage 1-herkomstbronnen die door dit document worden ondersteund.",
+    )
+    key_facts: list[str] = Field(
+        default_factory=list,
+        description="Kernfeiten uit het document die later door andere agents gebruikt kunnen worden.",
+    )
+    table_summary: str | None = Field(
+        default=None,
+        description="Korte samenvatting van tabellen in het document, indien aanwezig.",
+    )
+    opmerkingen: str | None = Field(
+        default=None,
+        description="Opmerkingen over leesbaarheid, hiaten of bijzonderheden.",
+    )
+
+
+class ReconEvidenceIndex(BaseModel):
+    """Structured output of the Recon agent over all documents."""
+
+    documents: list[ReconDocumentEvidence] = Field(
+        default_factory=list,
+        description="Samenvatting per document met leesbare documentnaam en kernbewijs.",
+    )
+    global_observations: list[str] = Field(
+        default_factory=list,
+        description="Algemene observaties over het dossier, zonder conclusies te trekken.",
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Combined Junior Structuur models (one LLM call instead of 3-4)
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -10,7 +10,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from config import get_heavy_llm, get_settings
 from models.agent_contracts import SeniorDecision
-from observability import count_empty_fields
+from observability import count_empty_fields, invoke_structured
 from prompts.system_prompts import SENIOR_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ def senior_agent(state: dict[str, Any]) -> dict[str, Any]:
     max_iterations = get_settings().max_senior_iterations
     analyst_feedback: list[str] = state.get("analyst_feedback", [])
     prior_senior_feedback: list[str] = state.get("senior_feedback", [])
+    recon_evidence = state.get("recon_evidence")
 
     secties = (
         _format_sectie("Identificatie & Verificatie", state.get("identificatie_sectie"))
@@ -51,6 +52,12 @@ def senior_agent(state: dict[str, Any]) -> dict[str, Any]:
         f"## Document-index (Recon Agent)\n{state['recon_index']}\n\n"
         f"## Gestructureerde output Junior Agents\n\n{secties}\n"
     )
+    if recon_evidence:
+        user_content += (
+            "## Structured evidence (Recon Agent)\n```json\n"
+            + json.dumps(recon_evidence, indent=2, ensure_ascii=False)
+            + "\n```\n\n"
+        )
 
     if analyst_feedback:
         user_content += (
@@ -74,8 +81,7 @@ def senior_agent(state: dict[str, Any]) -> dict[str, Any]:
         )
 
     llm = get_heavy_llm()
-    structured_llm = llm.with_structured_output(SeniorDecision)
-    decision: SeniorDecision = structured_llm.invoke([
+    decision = invoke_structured("senior", llm, SeniorDecision, [
         SystemMessage(content=SENIOR_PROMPT),
         HumanMessage(content=user_content),
     ])
@@ -119,12 +125,43 @@ def senior_agent(state: dict[str, Any]) -> dict[str, Any]:
         len(decision.remaining_gaps), len(feedback_items), total_empty,
     )
 
+    pending_juniors: list[str] = []
+    if not approved:
+        if decision.feedback_algemeen:
+            pending_juniors = [
+                "junior_structuur",
+                "junior_herkomst",
+                "junior_vermogen",
+            ]
+        else:
+            if decision.feedback_structuur:
+                pending_juniors.append("junior_structuur")
+            if decision.feedback_herkomst:
+                pending_juniors.append("junior_herkomst")
+            if decision.feedback_vermogen:
+                pending_juniors.append("junior_vermogen")
+            if not pending_juniors:
+                pending_juniors = [
+                    "junior_structuur",
+                    "junior_herkomst",
+                    "junior_vermogen",
+                ]
+
+    escalate_now = iteration >= 2 and not approved
+    escalate_junior_structuur = escalate_now and "junior_structuur" in pending_juniors
+    escalate_junior_herkomst = escalate_now and "junior_herkomst" in pending_juniors
+    escalate_junior_vermogen = escalate_now and "junior_vermogen" in pending_juniors
+
     return {
         "senior_approved": approved,
         "senior_feedback": feedback_items,
         "senior_feedback_structuur": decision.feedback_structuur or "",
         "senior_feedback_herkomst": decision.feedback_herkomst or "",
         "senior_feedback_vermogen": decision.feedback_vermogen or "",
+        "pending_juniors": pending_juniors,
+        "escalate_junior_structuur": escalate_junior_structuur,
+        "escalate_junior_herkomst": escalate_junior_herkomst,
+        "escalate_junior_vermogen": escalate_junior_vermogen,
         "iteration_count": iteration,
         "senior_review": senior_review,
         "senior_onderbouwing_classificatie": decision.onderbouwing_classificatie,

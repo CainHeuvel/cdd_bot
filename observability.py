@@ -1,15 +1,43 @@
-"""Lightweight observability: token usage logging and structured output quality metrics."""
+"""Lightweight observability for token usage and schema quality."""
 
 from __future__ import annotations
 
+from collections import Counter
+from contextvars import ContextVar, Token
 import logging
-from typing import Any
+from typing import Any, TypeVar
 from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.exceptions import OutputParserException
 from langchain_core.outputs import LLMResult
+from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger("cdd_pipeline.tokens")
+SchemaT = TypeVar("SchemaT", bound=BaseModel)
+
+
+class RunObservability:
+    """Per-run metrics container shared across the graph execution."""
+
+    def __init__(self) -> None:
+        self.token_handler = TokenUsageHandler()
+        self.schema_failures: Counter[str] = Counter()
+
+    def record_schema_failure(self, node_name: str, schema_name: str) -> None:
+        self.schema_failures[f"{node_name}:{schema_name}"] += 1
+
+    def summary(self) -> dict[str, Any]:
+        summary = self.token_handler.summary()
+        summary["schema_validation_failures"] = sum(self.schema_failures.values())
+        summary["schema_validation_failures_by_node"] = dict(self.schema_failures)
+        return summary
+
+
+_ACTIVE_RUN: ContextVar[RunObservability | None] = ContextVar(
+    "cdd_pipeline_active_run",
+    default=None,
+)
 
 
 class TokenUsageHandler(BaseCallbackHandler):
@@ -49,6 +77,44 @@ class TokenUsageHandler(BaseCallbackHandler):
             "total_completion_tokens": self.total_completion_tokens,
             "total_tokens": self.total_prompt_tokens + self.total_completion_tokens,
         }
+
+
+def activate_run_observability(run: RunObservability) -> Token[RunObservability | None]:
+    """Activate a run-level observability context for the current thread."""
+    return _ACTIVE_RUN.set(run)
+
+
+def deactivate_run_observability(token: Token[RunObservability | None]) -> None:
+    """Reset the current thread's run-level observability context."""
+    _ACTIVE_RUN.reset(token)
+
+
+def record_schema_failure(node_name: str, schema_name: str, exc: Exception) -> None:
+    """Log and count a structured-output validation failure."""
+    logger.warning(
+        "Schema validation failed | node=%s | schema=%s | error=%s",
+        node_name,
+        schema_name,
+        exc,
+    )
+    active_run = _ACTIVE_RUN.get()
+    if active_run is not None:
+        active_run.record_schema_failure(node_name, schema_name)
+
+
+def invoke_structured(
+    node_name: str,
+    llm: Any,
+    schema: type[SchemaT],
+    messages: list[Any],
+) -> SchemaT:
+    """Invoke a model with structured output and track schema failures."""
+    structured_llm = llm.with_structured_output(schema)
+    try:
+        return structured_llm.invoke(messages)
+    except (ValidationError, OutputParserException) as exc:
+        record_schema_failure(node_name, schema.__name__, exc)
+        raise
 
 
 def count_empty_fields(section: dict | None, section_name: str) -> int:

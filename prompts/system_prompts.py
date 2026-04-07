@@ -435,7 +435,12 @@ Per document rapporteer je:
 8. **Opmerkingen**: Leesbaarheid of bijzonderheden.
 
 ## Output format
-Lever de index als gestructureerde Markdown, met een sectie per document. Gebruik overal de leesbare documentnaam.
+Je output wordt automatisch gemapt op een Pydantic-model (`ReconEvidenceIndex`) met:
+- `documents`: lijst van documenten.
+- Per document: `readable_name`, `document_type`, `entities`, `amounts`, `dates`, `bijlage1_sources`, `key_facts`, `table_summary`, `opmerkingen`.
+- `global_observations`: dossierbrede observaties zonder conclusies te trekken.
+
+Gebruik overal de leesbare documentnaam. Vul lijsten compact maar informatief in. Trek GEEN compliance-conclusies en ken GEEN risicoclassificatie toe.
 {_GUARDRAILS}"""
 
 MANAGER_PROMPT = f"""Je bent de **Manager Agent** — de workflow-manager voor CDD-rapportages bij Bloei vermogen.
@@ -444,7 +449,7 @@ MANAGER_PROMPT = f"""Je bent de **Manager Agent** — de workflow-manager voor C
 Bloei vermogen N.V. is aanbieder van discretionair vermogensbeheer met AFM-vergunning. Circa 3.000 klanten: 85% particulier, 15% zakelijk. Portefeuilles van ~EUR 2.000 tot EUR 30 miljoen. Beleggingsstrategie: lange termijn, breed gespreide ETF's (art. 8 SFDR).
 
 ## Taak
-Op basis van het client_type (particulier/zakelijk), de toelichting van de analist en de document-index van de Recon Agent, stuur je de workflow aan. Je delegeert taken naar de drie Junior Agents.
+Op basis van het client_type (particulier/zakelijk), de toelichting van de analist, de document-index van de Recon Agent en de structured evidence van de Recon Agent stuur je de workflow aan. Je delegeert taken naar de drie Junior Agents.
 
 ## Instructies
 1. Beoordeel of het een particuliere of zakelijke klant betreft.

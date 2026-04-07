@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from config import get_heavy_llm
 from models.agent_contracts import ManagerInstructions
+from observability import invoke_structured
 from prompts.system_prompts import MANAGER_PROMPT
 
 
@@ -22,6 +24,7 @@ def manager_agent(state: dict[str, Any]) -> dict[str, Any]:
     client_type: str = state["client_type"]
     toelichting: str = state["toelichting"]
     recon_index: str = state["recon_index"]
+    recon_evidence = state.get("recon_evidence")
     analyst_feedback: list[str] = state.get("analyst_feedback", [])
     senior_feedback: list[str] = state.get("senior_feedback", [])
 
@@ -59,10 +62,15 @@ def manager_agent(state: dict[str, Any]) -> dict[str, Any]:
         f"## Document-index (Recon Agent)\n{recon_index}"
         f"{feedback_block}"
     )
+    if recon_evidence:
+        user_content += (
+            "\n\n## Structured evidence (Recon Agent)\n```json\n"
+            + json.dumps(recon_evidence, indent=2, ensure_ascii=False)
+            + "\n```"
+        )
 
     llm = get_heavy_llm()
-    structured_llm = llm.with_structured_output(ManagerInstructions)
-    instructions: ManagerInstructions = structured_llm.invoke([
+    instructions = invoke_structured("manager", llm, ManagerInstructions, [
         SystemMessage(content=MANAGER_PROMPT),
         HumanMessage(content=user_content),
     ])

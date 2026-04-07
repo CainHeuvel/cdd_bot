@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from config import get_heavy_llm
+from models.agent_contracts import ReconEvidenceIndex
+from observability import invoke_structured
 from prompts.system_prompts import RECON_PROMPT
 
 MAX_RAW_TEXT_CHARS = 12000
@@ -20,11 +23,44 @@ def _truncate(text: str, max_chars: int) -> tuple[str, bool]:
     return text[:max_chars], True
 
 
+def _render_recon_index(evidence: ReconEvidenceIndex) -> str:
+    """Render structured Recon evidence back into readable Markdown."""
+    sections: list[str] = []
+    for idx, doc in enumerate(evidence.documents, start=1):
+        lines = [
+            f"### Document {idx}: {doc.readable_name}",
+            f"- Type document: {doc.document_type}",
+        ]
+        if doc.entities:
+            lines.append("- Entiteiten: " + "; ".join(doc.entities))
+        if doc.amounts:
+            lines.append("- Bedragen: " + "; ".join(doc.amounts))
+        if doc.dates:
+            lines.append("- Datums: " + "; ".join(doc.dates))
+        if doc.bijlage1_sources:
+            lines.append("- Bijlage 1 classificatie: " + "; ".join(doc.bijlage1_sources))
+        if doc.key_facts:
+            lines.append("- Kernfeiten: " + "; ".join(doc.key_facts))
+        if doc.table_summary:
+            lines.append(f"- Tabellen: {doc.table_summary}")
+        if doc.opmerkingen:
+            lines.append(f"- Opmerkingen: {doc.opmerkingen}")
+        sections.append("\n".join(lines))
+
+    if evidence.global_observations:
+        sections.append(
+            "### Algemene observaties\n"
+            + "\n".join(f"- {item}" for item in evidence.global_observations)
+        )
+
+    return "\n\n".join(sections)
+
+
 def recon_agent(state: dict[str, Any]) -> dict[str, Any]:
     """Read raw OCR output and produce a structured document index.
 
-    Reads: documents
-    Writes: recon_index, current_agent
+    Reads: documents, toelichting
+    Writes: recon_index, recon_evidence, current_agent
     """
     documents: list[dict[str, Any]] = state["documents"]
     toelichting: str = state.get("toelichting", "")
@@ -59,12 +95,13 @@ def recon_agent(state: dict[str, Any]) -> dict[str, Any]:
     )
 
     llm = get_heavy_llm()
-    response = llm.invoke([
+    evidence = invoke_structured("recon", llm, ReconEvidenceIndex, [
         SystemMessage(content=RECON_PROMPT),
         HumanMessage(content=user_content),
     ])
 
     return {
-        "recon_index": response.content,
+        "recon_index": _render_recon_index(evidence),
+        "recon_evidence": json.loads(evidence.model_dump_json()),
         "current_agent": "recon",
     }
