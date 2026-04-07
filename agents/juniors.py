@@ -13,15 +13,9 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from config import get_light_llm
+from models.agent_contracts import JuniorStructuurParticulier, JuniorStructuurZakelijk
 from models.cdd_dossier import (
     HerkomstMiddelen,
-    IdentificatieVerificatie,
-    IdentificatieVerificatieZakelijk,
-    KlantprofielParticulier,
-    KlantprofielZakelijk,
-    Screening,
-    ScreeningZakelijk,
-    StructuurEnUbo,
     Transactieprofiel,
 )
 from models.organogram import OrganogramData
@@ -36,20 +30,33 @@ from rendering.organogram import render_organogram_svg
 logger = logging.getLogger(__name__)
 
 
-def _build_user_message(state: dict[str, Any]) -> str:
-    """Build the shared context block that every Junior receives."""
+def _build_user_message(
+    state: dict[str, Any],
+    *,
+    instruction_key: str | None = None,
+) -> str:
+    """Build the context block for a Junior agent.
+
+    Args:
+        state: The full CddState dict.
+        instruction_key: If provided, use this state key for the Manager
+            instruction (e.g. ``"manager_instructie_herkomst"``).
+    """
     client_type: str = state["client_type"]
     toelichting: str = state["toelichting"]
     recon_index: str = state["recon_index"]
-    manager_instructions: str = state.get("manager_instructions", "")
+
+    manager_instructions = state.get(instruction_key, "") if instruction_key else state.get("manager_instructions", "")
+    manager_feedback_algemeen: str = state.get("manager_feedback_algemeen", "")
     analyst_feedback: list[str] = state.get("analyst_feedback", [])
-    senior_feedback: list[str] = state.get("senior_feedback", [])
 
     parts = [
         f"## Client type\n{client_type}",
         f"## Toelichting analist\n{toelichting}",
         f"## Document-index (Recon Agent)\n{recon_index}",
     ]
+    if manager_feedback_algemeen:
+        parts.append(f"## Algemene instructie van de Manager Agent\n{manager_feedback_algemeen}")
     if manager_instructions:
         parts.append(f"## Instructies van de Manager Agent\n{manager_instructions}")
     if analyst_feedback:
@@ -57,67 +64,39 @@ def _build_user_message(state: dict[str, Any]) -> str:
             "## Feedback analist\n"
             + "\n".join(f"- {fb}" for fb in analyst_feedback)
         )
-    if senior_feedback:
-        parts.append(
-            "## Feedback Senior Agent (vorige iteratie)\n"
-            + "\n".join(f"- {fb}" for fb in senior_feedback)
-        )
     return "\n\n".join(parts)
 
 
 def junior_structuur_agent(state: dict[str, Any]) -> dict[str, Any]:
     """Build client profile, identification, screening and (zakelijk) ownership structure.
 
+    Uses a single combined LLM call per client type to avoid drift between
+    sections and reduce token waste from repeated context.
+
     Writes: identificatie_sectie, klantprofiel_sectie, screening_sectie,
-            structuur_ubo_sectie, organogram_svg, organogram_data
+            structuur_ubo_sectie, organogram_svg, organogram_data, organogram_warning
     """
     llm = get_light_llm()
     messages = [
         SystemMessage(content=JUNIOR_STRUCTUUR_PROMPT),
-        HumanMessage(content=_build_user_message(state)),
+        HumanMessage(content=_build_user_message(state, instruction_key="manager_instructie_structuur")),
     ]
     is_zakelijk = state.get("client_type", "").lower() == "zakelijk"
 
-    # --- Identificatie & verificatie ---
-    if is_zakelijk:
-        id_model = IdentificatieVerificatieZakelijk
-    else:
-        id_model = IdentificatieVerificatie
-
-    identificatie = llm.with_structured_output(id_model).invoke(messages)
-
-    # --- Klantprofiel ---
-    if is_zakelijk:
-        profiel_model = KlantprofielZakelijk
-    else:
-        profiel_model = KlantprofielParticulier
-
-    klantprofiel = llm.with_structured_output(profiel_model).invoke(messages)
-
-    # --- Screening ---
-    if is_zakelijk:
-        screening_model = ScreeningZakelijk
-    else:
-        screening_model = Screening
-
-    screening = llm.with_structured_output(screening_model).invoke(messages)
-
-    # --- Structuur & UBO + Organogram (alleen zakelijk) ---
     structuur_ubo_sectie = None
     organogram_svg = ""
     organogram_data = None
     organogram_warning = ""
 
     if is_zakelijk:
-        structuur_ubo = llm.with_structured_output(StructuurEnUbo).invoke(messages)
-        structuur_ubo_sectie = structuur_ubo.model_dump()
+        combined = llm.with_structured_output(JuniorStructuurZakelijk).invoke(messages)
+        structuur_ubo_sectie = combined.structuur_en_ubo.model_dump()
 
-        # Organogram extraction vanuit de eigendomsstructuur-beschrijving
         try:
             organogram_llm = llm.with_structured_output(OrganogramData)
-            eigendomsstructuur_tekst = structuur_ubo.eigendomsstructuur.antwoord
-            if structuur_ubo.eigendomsstructuur.toelichting:
-                eigendomsstructuur_tekst += "\n" + structuur_ubo.eigendomsstructuur.toelichting
+            eigendomsstructuur_tekst = combined.structuur_en_ubo.eigendomsstructuur.antwoord
+            if combined.structuur_en_ubo.eigendomsstructuur.toelichting:
+                eigendomsstructuur_tekst += "\n" + combined.structuur_en_ubo.eigendomsstructuur.toelichting
             org_result = organogram_llm.invoke([
                 SystemMessage(content=ORGANOGRAM_EXTRACTION_PROMPT),
                 HumanMessage(content=eigendomsstructuur_tekst),
@@ -131,11 +110,13 @@ def junior_structuur_agent(state: dict[str, Any]) -> dict[str, Any]:
                 "Controleer of Graphviz lokaal is geinstalleerd en of de eigendomsstructuur "
                 "voldoende duidelijk is beschreven."
             )
+    else:
+        combined = llm.with_structured_output(JuniorStructuurParticulier).invoke(messages)
 
     return {
-        "identificatie_sectie": identificatie.model_dump(),
-        "klantprofiel_sectie": klantprofiel.model_dump(),
-        "screening_sectie": screening.model_dump(),
+        "identificatie_sectie": combined.identificatie_verificatie.model_dump(),
+        "klantprofiel_sectie": combined.klantprofiel.model_dump(),
+        "screening_sectie": combined.screening.model_dump(),
         "structuur_ubo_sectie": structuur_ubo_sectie,
         "organogram_svg": organogram_svg,
         "organogram_data": organogram_data,
@@ -152,7 +133,7 @@ def junior_herkomst_agent(state: dict[str, Any]) -> dict[str, Any]:
     structured_llm = llm.with_structured_output(HerkomstMiddelen)
     messages = [
         SystemMessage(content=JUNIOR_HERKOMST_PROMPT),
-        HumanMessage(content=_build_user_message(state)),
+        HumanMessage(content=_build_user_message(state, instruction_key="manager_instructie_herkomst")),
     ]
     result: HerkomstMiddelen = structured_llm.invoke(messages)
 
@@ -170,7 +151,7 @@ def junior_vermogen_agent(state: dict[str, Any]) -> dict[str, Any]:
     structured_llm = llm.with_structured_output(Transactieprofiel)
     messages = [
         SystemMessage(content=JUNIOR_VERMOGEN_PROMPT),
-        HumanMessage(content=_build_user_message(state)),
+        HumanMessage(content=_build_user_message(state, instruction_key="manager_instructie_vermogen")),
     ]
     result: Transactieprofiel = structured_llm.invoke(messages)
 

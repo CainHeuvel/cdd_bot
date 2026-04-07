@@ -29,6 +29,10 @@ class CddState(TypedDict, total=False):
 
     recon_index: str
     manager_instructions: str
+    manager_feedback_algemeen: str
+    manager_instructie_structuur: str
+    manager_instructie_herkomst: str
+    manager_instructie_vermogen: str
 
     # Gestructureerde secties (Pydantic .model_dump() dicts)
     identificatie_sectie: dict | None
@@ -45,8 +49,12 @@ class CddState(TypedDict, total=False):
 
     analyst_feedback: list[str]
     senior_feedback: list[str]
+    senior_feedback_structuur: str
+    senior_feedback_herkomst: str
+    senior_feedback_vermogen: str
     senior_approved: bool
     senior_review: str
+    senior_onderbouwing_classificatie: str
     risicoclassificatie: str
     iteration_count: int
 

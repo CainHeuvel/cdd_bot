@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import json
-import re
+import logging
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from config import get_heavy_llm, get_settings
+from models.agent_contracts import SeniorDecision
 from prompts.system_prompts import SENIOR_PROMPT
+
+logger = logging.getLogger(__name__)
 
 
 def _format_sectie(label: str, sectie: dict | None) -> str:
@@ -19,24 +22,18 @@ def _format_sectie(label: str, sectie: dict | None) -> str:
     return f"### {label}\n```json\n{json.dumps(sectie, indent=2, ensure_ascii=False)}\n```\n"
 
 
-def _extract_status(content: str) -> str | None:
-    """Read the explicit Senior status line without substring false positives."""
-    match = re.search(r"^\*\*Status\*\*:\s*(GOEDGEKEURD|AFGEKEURD)\b", content, re.IGNORECASE | re.MULTILINE)
-    return match.group(1).upper() if match else None
-
-
 def senior_agent(state: dict[str, Any]) -> dict[str, Any]:
     """Validate Junior outputs against Wwft policy; approve or return feedback.
 
     Reads: all junior outputs, recon_index, analyst_feedback, senior_feedback, iteration_count
-    Writes: senior_approved, senior_feedback, iteration_count, current_agent
+    Writes: senior_approved, senior_feedback, senior_feedback_structuur, senior_feedback_herkomst,
+            senior_feedback_vermogen, iteration_count, senior_review, risicoclassificatie, current_agent
     """
     iteration = state.get("iteration_count", 0) + 1
     max_iterations = get_settings().max_senior_iterations
     analyst_feedback: list[str] = state.get("analyst_feedback", [])
     prior_senior_feedback: list[str] = state.get("senior_feedback", [])
 
-    # Build structured overview of all junior outputs
     secties = (
         _format_sectie("Identificatie & Verificatie", state.get("identificatie_sectie"))
         + _format_sectie("Klantprofiel", state.get("klantprofiel_sectie"))
@@ -70,38 +67,55 @@ def senior_agent(state: dict[str, Any]) -> dict[str, Any]:
 
     if iteration >= max_iterations:
         user_content += (
-            "**LET OP**: Dit is de laatste iteratie. Keur het rapport goed, "
-            "maar benoem alle resterende gaps expliciet zodat het Report Agent "
+            "**LET OP**: Dit is de laatste iteratie. Zet status op GOEDGEKEURD, "
+            "maar benoem alle resterende gaps in remaining_gaps zodat het Report Agent "
             "deze als ONTBREKEND kan markeren.\n"
         )
 
     llm = get_heavy_llm()
-    response = llm.invoke([
+    structured_llm = llm.with_structured_output(SeniorDecision)
+    decision: SeniorDecision = structured_llm.invoke([
         SystemMessage(content=SENIOR_PROMPT),
         HumanMessage(content=user_content),
     ])
 
-    content: str = response.content
-    status = _extract_status(content)
-    approved = status == "GOEDGEKEURD" or iteration >= max_iterations
+    approved = decision.status == "GOEDGEKEURD" or iteration >= max_iterations
 
     feedback_items: list[str] = []
-    if not approved:
-        feedback_items = [content]
+    for fb in [
+        decision.feedback_structuur,
+        decision.feedback_herkomst,
+        decision.feedback_vermogen,
+        decision.feedback_algemeen,
+    ]:
+        if fb:
+            feedback_items.append(fb)
 
-    # Parse risicoclassificatie from Senior output
-    risico_match = re.search(
-        r"\*\*Risicoclassificatie\*\*:\s*(Laag|Medium|Verhoogd|Onacceptabel)",
-        content,
-        re.IGNORECASE,
+    senior_review = (
+        f"**Status**: {decision.status}\n\n"
+        f"**Risicoclassificatie**: {decision.risicoclassificatie}\n"
+        f"**Onderbouwing**: {decision.onderbouwing_classificatie}\n"
     )
-    risicoclassificatie = risico_match.group(1) if risico_match else ""
+    if decision.remaining_gaps:
+        senior_review += "\n**Resterende gaps**:\n" + "\n".join(
+            f"- {g}" for g in decision.remaining_gaps
+        )
+
+    logger.info(
+        "Senior decision | iteration=%d | status=%s | risico=%s | gaps=%d | feedback_items=%d",
+        iteration, decision.status, decision.risicoclassificatie,
+        len(decision.remaining_gaps), len(feedback_items),
+    )
 
     return {
         "senior_approved": approved,
         "senior_feedback": feedback_items,
+        "senior_feedback_structuur": decision.feedback_structuur or "",
+        "senior_feedback_herkomst": decision.feedback_herkomst or "",
+        "senior_feedback_vermogen": decision.feedback_vermogen or "",
         "iteration_count": iteration,
-        "senior_review": content,
-        "risicoclassificatie": risicoclassificatie,
+        "senior_review": senior_review,
+        "senior_onderbouwing_classificatie": decision.onderbouwing_classificatie,
+        "risicoclassificatie": decision.risicoclassificatie,
         "current_agent": "senior",
     }

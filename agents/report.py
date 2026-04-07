@@ -24,36 +24,11 @@ def _format_sectie(label: str, sectie: dict | None) -> str:
     return f"### {label}\n```json\n{json.dumps(sectie, indent=2, ensure_ascii=False)}\n```\n"
 
 
-def _extract_senior_classification(senior_review: str, risicoclassificatie: str) -> str:
-    """Extract only the risk classification and rationale from senior review."""
-    parts = []
-    if risicoclassificatie:
-        parts.append(f"Risicoclassificatie: {risicoclassificatie}")
-
-    match = re.search(
-        r"(?:\*\*)?(?:Onderbouwing|Toelichting)\s*(?:classificatie)?(?:\*\*)?[:\s]*(.+?)(?=\n\n|\n\*\*|$)",
-        senior_review,
-        re.IGNORECASE | re.DOTALL,
-    )
-    if match:
-        parts.append(match.group(1).strip())
-    elif risicoclassificatie and senior_review:
-        match2 = re.search(
-            rf"{re.escape(risicoclassificatie)}[:\s.]*(.+?)(?=\n\n|\n\*\*|$)",
-            senior_review,
-            re.IGNORECASE | re.DOTALL,
-        )
-        if match2:
-            parts.append(match2.group(1).strip())
-
-    return "\n".join(parts) if parts else risicoclassificatie
-
-
 def report_agent(state: dict[str, Any]) -> dict[str, Any]:
     """Format approved outputs into the final CDD Markdown report.
 
     Reads: all structured dict sections, organogram_svg,
-           risicoclassificatie, senior_review
+           risicoclassificatie, senior_onderbouwing_classificatie
     Writes: final_report, current_agent
     """
     client_type: str = state["client_type"]
@@ -61,12 +36,12 @@ def report_agent(state: dict[str, Any]) -> dict[str, Any]:
 
     system_prompt = REPORT_PROMPT_ZAKELIJK if is_zakelijk else REPORT_PROMPT_PARTICULIER
 
-    # Extract only the classification + rationale, not feedback/validation notes
-    senior_review = state.get("senior_review", "")
     risicoclassificatie = state.get("risicoclassificatie", "[GEEN CLASSIFICATIE]")
-    classificatie_tekst = _extract_senior_classification(senior_review, risicoclassificatie)
+    senior_rationale = state.get(
+        "senior_onderbouwing_classificatie",
+        state.get("senior_review", ""),
+    )
 
-    # Build structured overview of all junior outputs
     secties = (
         _format_sectie("Identificatie & Verificatie", state.get("identificatie_sectie"))
         + _format_sectie("Klantprofiel", state.get("klantprofiel_sectie"))
@@ -79,10 +54,10 @@ def report_agent(state: dict[str, Any]) -> dict[str, Any]:
     user_content = (
         f"## Toelichting analist\n{state.get('toelichting', '')}\n\n"
         f"## Goedgekeurde output van de Junior Agents\n\n{secties}\n"
-        f"### Risicoclassificatie en onderbouwing (Senior Agent)\n{classificatie_tekst}\n\n"
+        f"### Risicoclassificatie (Senior Agent)\nRisicoclassificatie: {risicoclassificatie}\n\n"
+        f"### Onderbouwing classificatie (Senior Agent)\n{senior_rationale}\n\n"
     )
 
-    # Append organogram reference for zakelijk reports
     organogram_svg = state.get("organogram_svg", "")
     if is_zakelijk and organogram_svg:
         user_content += (
