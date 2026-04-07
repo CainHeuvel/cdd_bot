@@ -33,6 +33,8 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+Voor zakelijke dossiers met organogram is ook de Graphviz systeeminstallatie nodig, zodat het `dot`-commando beschikbaar is op `PATH`.
+
 ## Starten
 
 ```bash

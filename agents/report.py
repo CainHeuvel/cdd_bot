@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -16,16 +17,19 @@ def _strip_code_blocks(text: str) -> str:
     return re.sub(r"```[\s\S]*?```", "", text).strip()
 
 
-def _extract_senior_classification(senior_review: str, risicoclassificatie: str) -> str:
-    """Extract only the risk classification and rationale from senior review.
+def _format_sectie(label: str, sectie: dict | None) -> str:
+    """Format a Pydantic dict section as readable JSON for LLM consumption."""
+    if sectie is None:
+        return f"### {label}\n[GEEN OUTPUT]\n"
+    return f"### {label}\n```json\n{json.dumps(sectie, indent=2, ensure_ascii=False)}\n```\n"
 
-    Strips internal feedback, validation notes and status markers.
-    """
+
+def _extract_senior_classification(senior_review: str, risicoclassificatie: str) -> str:
+    """Extract only the risk classification and rationale from senior review."""
     parts = []
     if risicoclassificatie:
         parts.append(f"Risicoclassificatie: {risicoclassificatie}")
 
-    # Try to extract the rationale paragraph from the senior review
     match = re.search(
         r"(?:\*\*)?(?:Onderbouwing|Toelichting)\s*(?:classificatie)?(?:\*\*)?[:\s]*(.+?)(?=\n\n|\n\*\*|$)",
         senior_review,
@@ -34,7 +38,6 @@ def _extract_senior_classification(senior_review: str, risicoclassificatie: str)
     if match:
         parts.append(match.group(1).strip())
     elif risicoclassificatie and senior_review:
-        # Fallback: look for text after the classification mention
         match2 = re.search(
             rf"{re.escape(risicoclassificatie)}[:\s.]*(.+?)(?=\n\n|\n\*\*|$)",
             senior_review,
@@ -49,8 +52,8 @@ def _extract_senior_classification(senior_review: str, risicoclassificatie: str)
 def report_agent(state: dict[str, Any]) -> dict[str, Any]:
     """Format approved outputs into the final CDD Markdown report.
 
-    Reads: client_type, klantprofiel, herkomst_middelen, hnwi_status,
-           verklaard_vermogen, risicoclassificatie, senior_review
+    Reads: all structured dict sections, organogram_svg,
+           risicoclassificatie, senior_review
     Writes: final_report, current_agent
     """
     client_type: str = state["client_type"]
@@ -63,15 +66,30 @@ def report_agent(state: dict[str, Any]) -> dict[str, Any]:
     risicoclassificatie = state.get("risicoclassificatie", "[GEEN CLASSIFICATIE]")
     classificatie_tekst = _extract_senior_classification(senior_review, risicoclassificatie)
 
+    # Build structured overview of all junior outputs
+    secties = (
+        _format_sectie("Identificatie & Verificatie", state.get("identificatie_sectie"))
+        + _format_sectie("Klantprofiel", state.get("klantprofiel_sectie"))
+        + _format_sectie("Screening", state.get("screening_sectie"))
+        + _format_sectie("Structuur & UBO", state.get("structuur_ubo_sectie"))
+        + _format_sectie("Herkomst van Middelen", state.get("herkomst_sectie"))
+        + _format_sectie("Transactieprofiel", state.get("transactieprofiel_sectie"))
+    )
+
     user_content = (
         f"## Toelichting analist\n{state.get('toelichting', '')}\n\n"
-        f"## Goedgekeurde output van de Junior Agents\n\n"
-        f"### Klantprofiel / Structuur\n{state.get('klantprofiel', '[GEEN OUTPUT]')}\n\n"
-        f"### Herkomst van middelen\n{state.get('herkomst_middelen', '[GEEN OUTPUT]')}\n\n"
-        f"### HNWI Status en vermogen\n{state.get('hnwi_status', '[GEEN OUTPUT]')}\n\n"
-        f"### Verklaard vermogen komend jaar\n{state.get('verklaard_vermogen', '[GEEN OUTPUT]')}\n\n"
-        f"### Risicoclassificatie en onderbouwing\n{classificatie_tekst}\n\n"
+        f"## Goedgekeurde output van de Junior Agents\n\n{secties}\n"
+        f"### Risicoclassificatie en onderbouwing (Senior Agent)\n{classificatie_tekst}\n\n"
     )
+
+    # Append organogram reference for zakelijk reports
+    organogram_svg = state.get("organogram_svg", "")
+    if is_zakelijk and organogram_svg:
+        user_content += (
+            "### Organogram\n"
+            "Het organogram is beschikbaar als SVG en wordt apart weergegeven in de applicatie. "
+            "Neem het NIET op in het rapport.\n\n"
+        )
 
     llm = get_light_llm()
     response = llm.invoke([
@@ -79,7 +97,6 @@ def report_agent(state: dict[str, Any]) -> dict[str, Any]:
         HumanMessage(content=user_content),
     ])
 
-    # Strip any code blocks that may have leaked into the report text
     clean_report = _strip_code_blocks(response.content)
 
     return {

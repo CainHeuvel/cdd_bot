@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 # Literals  (afgeleid van het "Drop down"-tabblad in het werkbestand)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-Risicoclassificatie = Literal["Laag", "Medium", "Hoog", "Onacceptabel"]
+Risicoclassificatie = Literal["Laag", "Medium", "Verhoogd", "Onacceptabel"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

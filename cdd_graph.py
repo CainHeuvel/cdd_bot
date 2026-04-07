@@ -30,13 +30,20 @@ class CddState(TypedDict, total=False):
     recon_index: str
     manager_instructions: str
 
-    klantprofiel: str
+    # Gestructureerde secties (Pydantic .model_dump() dicts)
+    identificatie_sectie: dict | None
+    klantprofiel_sectie: dict | None
+    screening_sectie: dict | None
+    structuur_ubo_sectie: dict | None
+    herkomst_sectie: dict | None
+    transactieprofiel_sectie: dict | None
+
+    # Organogram (zakelijk)
     organogram_svg: str
     organogram_data: dict | None
-    herkomst_middelen: str
-    hnwi_status: str
-    verklaard_vermogen: str
+    organogram_warning: str
 
+    analyst_feedback: list[str]
     senior_feedback: list[str]
     senior_approved: bool
     senior_review: str
