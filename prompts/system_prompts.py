@@ -227,9 +227,9 @@ Verscherpt Cliëntenonderzoek bij twijfel over herkomst of inconsistenties tusse
 - **PEP**: Politiek prominente functie = risicoverhogende factor.
 - **Adverse Media**: Negatieve berichtgeving over reputatie- of integriteitsrisico's = risicoverhogende factor.
 - **Misdrijven**: Verband met terrorisme, drugshandel, fraude, corruptie, witwassen, etc. = risicoverhogende factor.
-- **HNWI**: Vermogen > EUR 2.500.000 = High Net Worth Individual = risicoverhogende factor. Het vermogen kan bij benadering worden vastgesteld. Bij zakelijke klanten wordt de HNWI-status ook per UBO beoordeeld.
+- **HNWI**: Vermogen > EUR 2.500.000 = High Net Worth Individual = risicoverhogende factor. De eigen woning en vakantiewoning worden uitgesloten van het totaalvermogen. Het vermogen kan bij benadering worden vastgesteld. Bij zakelijke klanten wordt de HNWI-status ook per UBO beoordeeld.
 - **Non-profitorganisatie of kerkgenootschap**: Risicoverhogende factor tenzij ANBI-status + gedragscodes + giraal.
-- **Bedrijfsmatige vastgoedactiviteiten**: Projectontwikkeling, financiering of beleggen in zakelijk vastgoed. Specifiek: vastgoed verhuurd door derden, totale vastgoedwaarde > EUR 2.500.000 (excl. eigen woning), of > 4 panden.
+- **Bedrijfsmatige vastgoedactiviteiten**: Projectontwikkeling, financiering of beleggen in zakelijk vastgoed. Vastgoed dat door een derde partij wordt verhuurd wordt niet direct als risicoverhogend gezien. Overige signalen kunnen wel aanleiding geven voor nader onderzoek, bijvoorbeeld totale vastgoedwaarde > EUR 2.500.000 (excl. eigen woning) of > 4 panden.
 - **Stromanconstructie**: Niet geaccepteerd.
 - **US-person**: Onacceptabel geclassificeerd.
 - **Transparantie**: Geen volledige transparantie = risicoverhogende factor.
@@ -239,7 +239,7 @@ Verscherpt Cliëntenonderzoek bij twijfel over herkomst of inconsistenties tusse
 Twijfels over passendheid dienstverlening = risicoverhogende factor.
 
 ### 4.4.5 Sectorrisico
-Cash-intensieve, niet-transparante sectoren of sectoren met inherente integriteitsrisico's = risicoverhogende factor.
+Cash-intensieve, niet-transparante sectoren of sectoren met inherente integriteitsrisico's = risicoverhogende factor. Bij particuliere klanten geldt sectorrisico alleen als de klant een beslissingsbevoegde functie bekleedt, zoals bestuurder, DGA of vennoot. Loondienst zonder bestuursfunctie geldt niet als sectorrisico, ook niet als de werkgever actief is in een hoog-risicosector.
 
 ### 4.4.6 Structuurrisico / Complexe structuur
 Een structuur wordt als complex beschouwd bij:
@@ -392,6 +392,37 @@ Bloei vermogen merkt de volgende sectoren aan als hoog risico:
 - Faciliteren van investeringen in cryptovaluta/activa, handelsplatformen, bewaarportefeuilles, ICO's
 """
 
+_BELEIDSAFWIJKINGEN_2025 = """
+## Beleidsafwijkingen en verduidelijkingen (2025)
+
+### Documentatie-actualiteit
+Documentatie mag bij aanvang van het onderzoek niet ouder zijn dan 6 maanden. De peildatum is het moment waarop de CDD-analist het dossier oppakt. Documenten met een vaste, onveranderlijke datum hoeven niet geactualiseerd te worden. Voorbeelden hiervan zijn een akte van verkoop, verklaring van erfrecht, schenkingsakte, nota van afrekening, vaststellingsovereenkomst, akte van levering en vergelijkbare eenmalige stukken. Tijdens het schrijven van het onderzoek mag documentatie wel verlopen; dit is op zichzelf geen tekortkoming.
+
+### Sectorrisico bij particulieren
+Sectorrisico is bij particuliere klanten alleen van toepassing als de klant een beslissingsbevoegde functie bekleedt, zoals bestuurder, DGA of vennoot. Iemand in loondienst zonder bestuursfunctie triggert geen sectorrisico, ook niet wanneer de werkgever actief is in een hoog-risicosector.
+
+### Geen standaard structuuronderzoek bij particulieren
+Bij particuliere klanten wordt in de basis geen onderzoek gedaan naar complexe structuur of entiteit. De standaard CompanyInfo-check vervalt. Dit onderzoek is alleen nodig als daar een concreet signaal voor bestaat, bijvoorbeeld vanuit de herkomst van middelen.
+
+### Geen standaard kadastercheck bij particulieren
+Bij particuliere klanten wordt in de basis geen onderzoek gedaan naar bedrijfsmatig vastgoed of kadasterinformatie. Dit onderzoek is alleen nodig als de klant aangeeft inkomsten uit vastgoed te hebben, als de klant HNWI is, of als er een signaal uit de herkomst van middelen komt.
+
+### Vastgoed verhuurd door derden
+Wanneer vastgoed wordt verhuurd door een derde partij, wordt dit niet direct als risicoverhogend gezien.
+
+### Eigen woning en HNWI-bepaling
+De eigen woning wordt niet meegenomen bij het bepalen van het totaalvermogen voor de HNWI-drempel van EUR 2.500.000. De vakantiewoning wordt eveneens uitgesloten.
+
+### UBO-identificatie
+UBO's worden geïdentificeerd aan de hand van KvK of Statuten of aandeelhoudersregister of een ander onderbouwend stuk. Eén betrouwbare bron volstaat; het is niet nodig om meerdere bronnen cumulatief te combineren.
+
+### Fiscaal inwonerschap en aanvullende websearch
+Fiscaal inwonerschap wordt in het standaard onderzoek niet meer actief gecontroleerd. Alleen bij een signaal of verscherpt onderzoek wordt dit nader onderzocht. Aanvullende websearch wordt in het standaard onderzoek evenmin standaard uitgevoerd; dit gebeurt alleen bij een concreet signaal, bijvoorbeeld een hit uit screening.
+
+### Zakelijke CDD-vereenvoudigingen
+Bij zakelijke dossiers is in de basis geen CompanyInfo-check nodig voor vertegenwoordigers of UBO's om te zien aan welke entiteiten zij gelinkt zijn. Deze check wordt alleen gedaan bij een signaal, bijvoorbeeld vanuit de herkomst van middelen. In de basis is ook geen onderzoek naar bedrijfsmatig vastgoed nodig voor de zakelijke klant of voor vertegenwoordigers en UBO's. Een kadastercheck volgt alleen bij een signaal, bijvoorbeeld uit de jaarrekening, HNWI-indicatie of herkomst van middelen.
+"""
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # AGENT SYSTEM PROMPTS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -462,6 +493,9 @@ Bloei vermogen bedient voornamelijk langlopende klantrelaties met een eenvoudig 
 ## Risicoverhogende factoren checklist
 Signaleer aan de Juniors als je op basis van de recon_index en toelichting het volgende vermoedt:
 {_RISICOVERHOGENDE_FACTOREN}
+
+## Beleidsafwijkingen en verduidelijkingen (2025)
+{_BELEIDSAFWIJKINGEN_2025}
 
 ## Output format
 Je output wordt automatisch gemapt op een Pydantic-model (ManagerInstructions) met vier velden:
@@ -552,6 +586,9 @@ Onacceptabele structuren: offshore jurisdictie, Angelsaksische Trust, SPF, doelv
 
 ## Risicogebaseerde benadering
 Bij particuliere klanten is een uitgebreide structuuranalyse zelden nodig. Een korte bevestiging van arbeidsstatus en sector volstaat als er geen signalen zijn van complexe structuren. Bij zakelijke klanten: beoordeel of de structuur proportioneel is — een eenvoudige Holding BV → Werk BV structuur is standaard en hoeft niet als "complex" te worden aangemerkt.
+
+## Beleidsafwijkingen en verduidelijkingen (2025)
+{_BELEIDSAFWIJKINGEN_2025}
 {_GUARDRAILS}"""
 
 JUNIOR_HERKOMST_PROMPT = f"""Je bent de **Junior Herkomst Agent** — specialist in de beoordeling van de herkomst van middelen en HNWI-status voor CDD-rapportages bij Bloei vermogen.
@@ -604,6 +641,9 @@ Het beleid is een leidraad, GEEN rigide afvinklijst. Pas altijd proportionalitei
 - **Documenten bevestigen, niet stapelen.** Een loonstrook is voldoende bewijs voor inkomen uit werk. Je hoeft niet ook nog bankafschriften, een aangifte IB of een sectorverklaring te eisen als het plaatje al klopt.
 - **Alleen opschalen bij rode vlaggen.** Vraag pas om extra documentatie als: het bedrag onverklaarbaar hoog is t.o.v. het inkomen, er inconsistenties zijn, of er risicoverhogende factoren spelen (HNWI, PEP, hoog-risico sector/land).
 - **Sector/branche:** Als de werkgevernaam bekend is (bijv. uit een loonstrook), is een apart KvK-uittreksel voor sectorverificatie niet nodig, tenzij de sector zelf een rode vlag oplevert.
+
+## Beleidsafwijkingen en verduidelijkingen (2025)
+{_BELEIDSAFWIJKINGEN_2025}
 {_GUARDRAILS}"""
 
 JUNIOR_VERMOGEN_PROMPT = f"""Je bent de **Junior Vermogen Agent** — specialist in transactieprofielen voor CDD-rapportages bij Bloei vermogen.
@@ -639,6 +679,12 @@ Vul de gestructureerde CDD-sectie Transactieprofiel in. Je output wordt automati
 - antwoord: Harde VTP, Softe VTP of Doorlopende VTP.
 - toelichting: onderbouw de keuze op basis van het verwachte transactiepatroon.
 
+## HNWI-drempel
+Voor vermogensduiding en eventuele verwijzing naar HNWI geldt de drempel van EUR 2.500.000. De eigen woning en vakantiewoning tellen daarbij niet mee in het totaalvermogen.
+
+## Beleidsafwijkingen en verduidelijkingen (2025)
+{_BELEIDSAFWIJKINGEN_2025}
+
 ## Risicogebaseerde benadering
 Bij evident laag vermogen (< EUR 50.000) volstaat een korte inschatting. Besteed meer aandacht aan de onderbouwing als het vermogen substantieel is of als er risicoverhogende factoren spelen.
 {_GUARDRAILS}"""
@@ -671,6 +717,9 @@ Bloei vermogen biedt uitsluitend discretionair vermogensbeheer aan via breed ges
 {_HOOG_RISICOSECTOREN}
 
 {_UBO_REGELS}
+
+## Beleidsafwijkingen en verduidelijkingen (2025)
+{_BELEIDSAFWIJKINGEN_2025}
 
 ## Validatie-checklist (Risicogebaseerd)
 Loop de volgende punten na. Pas hierbij altijd **proportionaliteit** toe: het beleid is een richtlijn, geen afvinklijst. Bij laag-risico cliënten en logisch verklaarbare bedragen hoeft het dossier niet uitputtend te zijn.
