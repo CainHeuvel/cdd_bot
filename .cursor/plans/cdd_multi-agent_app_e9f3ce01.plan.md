@@ -37,7 +37,7 @@ isProject: false
 ## Projectstructuur
 
 ```
-Agentic CDD tooling/
+cdd_bot/
 ├── .env.example              # Alle environment variabelen
 ├── requirements.txt          # Pinned dependencies
 ├── README.md                 # Azure setup guide + gebruiksinstructies

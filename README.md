@@ -1,4 +1,4 @@
-# CDD Rapportage Tool
+# cdd_bot
 
 Interne Streamlit-applicatie die analisten ondersteunt bij het schrijven van Customer Due Diligence (CDD) rapportages. De tool gebruikt een multi-agent architectuur via LangGraph om het Wwft-beleid strikt toe te passen op basis van een toelichting en geüploade bewijsstukken (PDF's).
 

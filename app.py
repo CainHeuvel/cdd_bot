@@ -1,4 +1,4 @@
-"""Streamlit UI for the CDD Rapportage Tool."""
+"""Streamlit UI for the cdd_bot project."""
 
 from __future__ import annotations
 
